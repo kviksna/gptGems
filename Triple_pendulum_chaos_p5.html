@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triple Pendulum Chaos Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #1a1a1a; color: #f0f0f0; font-family: Arial, sans-serif; }
+        #controls { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+        .control-group { margin: 10px 0; display: flex; align-items: center; }
+        label { margin-right: 10px; }
+        button { margin: 0 5px; padding: 5px 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #speedValue { margin-left: 10px; min-width: 30px; text-align: left; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="controls">
+        <div class="control-group">
+            <label for="speed">Animation Speed:</label>
+            <input type="range" id="speed" min="0.01" max="1" step="0.01" value="0.12">
+            <span id="speedValue">0.12x</span>
+        </div>
+        <div class="control-group">
+            <label><input type="checkbox" id="trace1"> Trace Point 1</label>
+            <label><input type="checkbox" id="trace2"> Trace Point 2</label>
+            <label><input type="checkbox" id="trace3" checked> Trace Point 3</label>
+        </div>
+        <div class="control-group">
+            <button id="reset">Reset</button>
+        </div>
+    </div>
+    <script>
+        let pendulums = [];
+        const g = 9.81;
+        let animationSpeed = 0.12;
+        let tracePoints = [false, false, true];
+        let traces = [[], [], []];
+
+        function setup() {
+            let canvas = createCanvas(800, 600);
+            canvas.parent('canvas-container');
+            frameRate(60);
+            
+            resetPendulums();
+
+            document.getElementById('speed').addEventListener('input', (e) => {
+                animationSpeed = parseFloat(e.target.value);
+                document.getElementById('speedValue').textContent = animationSpeed.toFixed(2) + 'x';
+            });
+
+            document.getElementById('trace1').addEventListener('change', (e) => {
+                tracePoints[0] = e.target.checked;
+                if (!e.target.checked) traces[0] = [];
+            });
+
+            document.getElementById('trace2').addEventListener('change', (e) => {
+                tracePoints[1] = e.target.checked;
+                if (!e.target.checked) traces[1] = [];
+            });
+
+            document.getElementById('trace3').addEventListener('change', (e) => {
+                tracePoints[2] = e.target.checked;
+                if (!e.target.checked) traces[2] = [];
+            });
+
+            document.getElementById('reset').addEventListener('click', resetPendulums);
+        }
+
+        function resetPendulums() {
+            pendulums = [];
+            pendulums.push(new TriplePendulum(400, 100, PI/2, PI/2, PI/2, 100, 100, 100, color(255, 0, 0)));
+            pendulums.push(new TriplePendulum(400, 100, PI/2 + 0.01, PI/2, PI/2, 100, 100, 100, color(0, 255, 0)));
+            pendulums.push(new TriplePendulum(400, 100, PI/2, PI/2 + 0.01, PI/2, 100, 100, 100, color(0, 0, 255)));
+            traces = [[], [], []];
+        }
+
+        function draw() {
+            background(26);
+            
+            for (let pendulum of pendulums) {
+                pendulum.update(animationSpeed);
+            }
+
+            for (let i = 0; i < 3; i++) {
+                if (tracePoints[i]) {
+                    noFill();
+                    stroke(pendulums[i].color);
+                    beginShape();
+                    for (let point of traces[i]) {
+                        vertex(point.x, point.y);
+                    }
+                    endShape();
+                }
+            }
+
+            for (let pendulum of pendulums) {
+                pendulum.display();
+            }
+        }
+
+        class TriplePendulum {
+            constructor(x, y, angle1, angle2, angle3, length1, length2, length3, color) {
+                this.origin = createVector(x, y);
+                this.angle1 = angle1;
+                this.angle2 = angle2;
+                this.angle3 = angle3;
+                this.length1 = length1;
+                this.length2 = length2;
+                this.length3 = length3;
+                this.color = color;
+
+                this.aVelocity1 = 0;
+                this.aVelocity2 = 0;
+                this.aVelocity3 = 0;
+                this.aAcceleration1 = 0;
+                this.aAcceleration2 = 0;
+                this.aAcceleration3 = 0;
+
+                this.damping = 0.999;
+            }
+
+            update(speed) {
+                // Simplified equations of motion for a triple pendulum
+                let num1 = -g * (2 * this.length1 + this.length2) * sin(this.angle1);
+                let num2 = -this.length2 * g * sin(this.angle1 - 2 * this.angle2);
+                let num3 = -2 * sin(this.angle1 - this.angle2);
+                let num4 = this.aVelocity2 * this.aVelocity2 * this.length2 + this.aVelocity1 * this.aVelocity1 * this.length1 * cos(this.angle1 - this.angle2);
+                let den = this.length1 * (2 * this.length1 + this.length2 - this.length2 * cos(2 * this.angle1 - 2 * this.angle2));
+                this.aAcceleration1 = (num1 + num2 + num3 * num4) / den;
+
+                num1 = 2 * sin(this.angle1 - this.angle2);
+                num2 = this.aVelocity1 * this.aVelocity1 * this.length1 * (this.length1 + this.length2);
+                num3 = g * (this.length1 + this.length2) * cos(this.angle1);
+                num4 = this.aVelocity2 * this.aVelocity2 * this.length2 * cos(this.angle1 - this.angle2);
+                den = this.length2 * (2 * this.length1 + this.length2 - this.length2 * cos(2 * this.angle1 - 2 * this.angle2));
+                this.aAcceleration2 = (num1 * (num2 + num3 + num4)) / den;
+
+                // Simplified third pendulum motion
+                this.aAcceleration3 = (-g * sin(this.angle3) - this.aVelocity3 * 0.1) / this.length3;
+
+                this.aVelocity1 += this.aAcceleration1 * speed;
+                this.aVelocity2 += this.aAcceleration2 * speed;
+                this.aVelocity3 += this.aAcceleration3 * speed;
+                this.angle1 += this.aVelocity1 * speed;
+                this.angle2 += this.aVelocity2 * speed;
+                this.angle3 += this.aVelocity3 * speed;
+
+                // Apply damping
+                this.aVelocity1 *= this.damping;
+                this.aVelocity2 *= this.damping;
+                this.aVelocity3 *= this.damping;
+            }
+
+            display() {
+                stroke(this.color);
+                strokeWeight(2);
+                fill(this.color);
+
+                let x1 = this.origin.x + this.length1 * sin(this.angle1);
+                let y1 = this.origin.y + this.length1 * cos(this.angle1);
+                let x2 = x1 + this.length2 * sin(this.angle2);
+                let y2 = y1 + this.length2 * cos(this.angle2);
+                let x3 = x2 + this.length3 * sin(this.angle3);
+                let y3 = y2 + this.length3 * cos(this.angle3);
+
+                line(this.origin.x, this.origin.y, x1, y1);
+                line(x1, y1, x2, y2);
+                line(x2, y2, x3, y3);
+
+                ellipse(x1, y1, 10, 10);
+                ellipse(x2, y2, 10, 10);
+                ellipse(x3, y3, 10, 10);
+
+                if (tracePoints[0]) traces[0].push(createVector(x1, y1));
+                if (tracePoints[1]) traces[1].push(createVector(x2, y2));
+                if (tracePoints[2]) traces[2].push(createVector(x3, y3));
+
+                // Limit the number of trace points to prevent performance issues
+                const maxTracePoints = 500;
+                for (let i = 0; i < 3; i++) {
+                    if (traces[i].length > maxTracePoints) {
+                        traces[i].splice(0, traces[i].length - maxTracePoints);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
